@@ -1,6 +1,14 @@
-gl.setup(NATIVE_WIDTH, NATIVE_HEIGHT)
+-- Portrait dual screen: physical output is 3840x1080 (two 1080p screens
+-- side by side). We set up a rotated 1080x3840 virtual canvas instead,
+-- then rotate it onto the physical output in node.render below.
+gl.setup(NATIVE_HEIGHT, NATIVE_WIDTH)
 
 util.no_globals()
+
+-- Clockwise rotation of the whole canvas. Use 270 if the picture ends up
+-- upside down on the screens.
+local screen_rotation = 90
+local st = util.screen_transform(screen_rotation)
 
 local function image(file, duration)
     local img, ends
@@ -155,21 +163,26 @@ util.json_watch("config.json", function(config)
     playlist_2.update(config.playlist_2)
 end)
 
+-- On the rotated 1080x3840 canvas the two screens stack vertically:
+-- screen A is 0,0 to 1080,1920 and screen B is 0,1920 to 1080,3840.
+-- If the playlists come out on the wrong screens, swap the content in the
+-- setup rather than editing this.
 local runner_1 = Runner(playlist_1, {
     x1 = 0,
     y1 = 0,
-    x2 = WIDTH/2,
-    y2 = HEIGHT,
+    x2 = WIDTH,
+    y2 = HEIGHT/2,
 })
 
 local runner_2 = Runner(playlist_2, {
-    x1 = WIDTH/2,
-    y1 = 0,
+    x1 = 0,
+    y1 = HEIGHT/2,
     x2 = WIDTH,
     y2 = HEIGHT,
 })
 
 function node.render()
+    st()
     runner_1.tick()
     runner_2.tick()
 end
