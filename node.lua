@@ -1,14 +1,28 @@
--- Portrait dual screen: physical output is 3840x1080 (two 1080p screens
--- side by side). We set up a rotated 1080x3840 virtual canvas instead,
--- then rotate it onto the physical output in node.render below.
-gl.setup(NATIVE_HEIGHT, NATIVE_WIDTH)
+-- Physical output stays native: 3840x1080 (two 1080p screens side by side).
+-- screen_transform below gives us a portrait drawing space on top of it.
+gl.setup(NATIVE_WIDTH, NATIVE_HEIGHT)
 
 util.no_globals()
 
--- Clockwise rotation of the whole canvas. Use 270 if the picture ends up
--- upside down on the screens.
-local screen_rotation = 90
-local st = util.screen_transform(screen_rotation)
+-- Clockwise rotation. Change to 270 if the picture is upside down.
+local ROTATION = 90
+
+local st = util.screen_transform(ROTATION)
+
+-- Portrait drawing space. WIDTH/HEIGHT still report the native landscape
+-- values, so the portrait canvas is 1080 wide and 3840 tall.
+local PW, PH = HEIGHT, WIDTH
+
+-- Raw videos are placed with video:place(), which uses absolute SCREEN
+-- coordinates and is drawn outside GL, so screen_transform does not touch
+-- them. Map a portrait rect to the screen rect it ends up occupying.
+local function to_screen(x1, y1, x2, y2)
+    if ROTATION == 90 then
+        return WIDTH - y2, x1, WIDTH - y1, x2
+    else -- 270
+        return y1, HEIGHT - x2, y2, HEIGHT - x1
+    end
+end
 
 local function image(file, duration)
     local img, ends
@@ -50,7 +64,13 @@ local function video(file, duration)
             local state, width, height = vid:state()
             if state == "paused" then
                 local x1, y1, x2, y2 = util.scale_into(pos.x2-pos.x1, pos.y2-pos.y1, width, height)
-                vid:place(pos.x1+x1, pos.y1+y1, pos.x1+x2, pos.y1+y2):layer(1):start()
+                -- Fitted rect in portrait coordinates...
+                local px1, py1 = pos.x1+x1, pos.y1+y1
+                local px2, py2 = pos.x1+x2, pos.y1+y2
+                -- ...translated to screen coordinates, with the video itself
+                -- rotated to match.
+                local sx1, sy1, sx2, sy2 = to_screen(px1, py1, px2, py2)
+                vid:place(sx1, sy1, sx2, sy2, ROTATION):layer(1):start()
             end
             return sys.now() <= ends -- and (state == "paused" or state == "loaded")
         end;
@@ -163,22 +183,20 @@ util.json_watch("config.json", function(config)
     playlist_2.update(config.playlist_2)
 end)
 
--- On the rotated 1080x3840 canvas the two screens stack vertically:
--- screen A is 0,0 to 1080,1920 and screen B is 0,1920 to 1080,3840.
--- If the playlists come out on the wrong screens, swap the content in the
--- setup rather than editing this.
+-- Two portrait zones of 1080x1920 each, stacked in portrait coordinates.
+-- If the playlists land on the wrong screens, swap the content in the setup.
 local runner_1 = Runner(playlist_1, {
     x1 = 0,
     y1 = 0,
-    x2 = WIDTH,
-    y2 = HEIGHT/2,
+    x2 = PW,
+    y2 = PH/2,
 })
 
 local runner_2 = Runner(playlist_2, {
     x1 = 0,
-    y1 = HEIGHT/2,
-    x2 = WIDTH,
-    y2 = HEIGHT,
+    y1 = PH/2,
+    x2 = PW,
+    y2 = PH,
 })
 
 function node.render()
