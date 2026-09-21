@@ -2,6 +2,6 @@
     "name": "Dual Image/Video player",
     "desc": "Play two videos/images side by side",
     "author": "Florian Wesch <fw@info-beamer.com>",
-    "repository": "https://github.com/info-beamer/package-dual-player",
+    "repository": "https://github.com/kenneth-koerno/package-dual-player-90degree",
     "platforms": ["pi/v6", "pi/v7", "pi/v8"]
 }
